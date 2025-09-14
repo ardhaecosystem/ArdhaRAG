@@ -1,0 +1,44 @@
+service:
+  http_port: 6333
+  grpc_port: 6334
+  enable_cors: true
+  
+storage:
+  # Memory optimization for 2GB container limit
+  on_disk_payload: true              # Store payloads on disk to save memory
+  memory_mapping_threshold_kb: 50000 # Use memory mapping for large files
+  
+  # Enable binary quantization for 4x memory reduction
+  quantization:
+    scalar:
+      type: int8
+      quantile: 0.99
+      always_ram: true
+  
+  # Optimize for SSD storage
+  wal:
+    wal_capacity_mb: 32
+    wal_segments_ahead: 0
+  
+  # Collection defaults
+  default_collection_config:
+    optimizer:
+      # Optimize for memory usage
+      memmap_threshold_kb: 100000
+      indexing_threshold_kb: 20000
+      flush_interval_sec: 5
+    
+    # HNSW parameters optimized for memory
+    hnsw_config:
+      m: 16                    # Reduced from default 16 for memory efficiency
+      ef_construct: 100        # Balanced accuracy/memory trade-off
+      full_scan_threshold: 10000
+      max_indexing_threads: 2  # Match CPU cores
+
+cluster:
+  enabled: false
+
+log_level: INFO
+
+telemetry:
+  disabled: false
