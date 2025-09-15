@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  ardharag-dev:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.dev
+    ports:
+      - "8000:8000"
+      - "8501:8501"
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
+      - PYTHONPATH=/app
+    volumes:
+      # Live code reloading
+      - ../ardharag:/app/ardharag:cached
+      - ../tests:/app/tests:cached
+      - ../scripts:/app/scripts:cached
+      - ../docs:/app/docs:cached
+      - ../examples:/app/examples:cached
+      # Preserve virtual environment
+      - dev_venv:/app/.venv
+      # Development cache
+      - dev_cache:/app/.cache
+    working_dir: /app
+    networks:
+      - ardharag_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: |
+      bash -c "
+        echo '🚀 ArdhaRAG Development Environment Starting...'
+        echo '📦 Installing development dependencies...'
+        poetry install --no-interaction
+        echo '✅ Development environment ready!'
+        echo '🔄 Watching for code changes...'
+        tail -f /dev/null
+      "
+
+  # Use existing database services with explicit env_file reference
+  postgres:
+    extends:
+      file: ../infrastructure/docker/docker-compose.yml
+      service: postgres
+    env_file:
+      - ../infrastructure/docker/.env
+
+  redis:
+    extends:
+      file: ../infrastructure/docker/docker-compose.yml
+      service: redis
+    env_file:
+      - ../infrastructure/docker/.env
+
+  qdrant:
+    extends:
+      file: ../infrastructure/docker/docker-compose.yml
+      service: qdrant
+    env_file:
+      - ../infrastructure/docker/.env
+
+volumes:
+  # Development-specific volumes
+  dev_venv:
+    driver: local
+  dev_cache:
+    driver: local
+  # Extended service volumes (must be declared here too)
+  postgres_data:
+    external: true
+  qdrant_data:
+    external: true
+  redis_data:
+    external: true
+
+networks:
+  ardharag_network:
+    external: true
