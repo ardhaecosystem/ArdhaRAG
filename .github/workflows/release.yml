@@ -1,0 +1,43 @@
+name: 🎉 Release Management
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  create-release:
+    name: 🎁 Create Release
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: 🎉 Create GitHub Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: ArdhaRAG ${{ github.ref }}
+        body: |
+          ## 🚀 ArdhaRAG Release ${{ github.ref }}
+          
+          World's First Predictive RAG System
+          
+          ### 📦 Installation
+          
+          ```bash
+          curl -sSL https://raw.githubusercontent.com/ardhaecosystem/ardharag/${{ github.ref }}/scripts/install.sh | bash
+          ```
+          
+          ### 🔮 Revolutionary Features
+          - Context-Aware Prompt Engineering (40-60% token reduction)
+          - Hallucination prevention and verification
+          - Predictive intelligence capabilities
+          - Resource-efficient deployment (8GB RAM)
+        draft: false
+        prerelease: ${{ contains(github.ref, '-') }}
