@@ -1,97 +1,206 @@
-name: 🚀 ArdhaRAG CI/CD Pipeline
+name: 🔄 Continuous Integration
 
 on:
   push:
-    branches: [ main, develop, staging ]
+    branches: [main, develop, staging]
   pull_request:
-    branches: [ main, develop, staging ]
+    branches: [main, develop, staging]
 
 env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  PYTHON_VERSION: "3.11"
+  POETRY_VERSION: "1.7.1"
 
 jobs:
-  # Code Quality and Testing
-  quality-check:
-    name: 🔍 Code Quality & Testing
+  # Code Quality Checks
+  code-quality:
+    name: 🧹 Code Quality
     runs-on: ubuntu-latest
-    
     steps:
-    - name: 📥 Checkout code
-      uses: actions/checkout@v4
-      
-    - name: 🐍 Setup Python 3.11
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-        
-    - name: 📦 Install Poetry
-      uses: snok/install-poetry@v1
-      with:
-        version: 2.1.4
-        virtualenvs-create: true
-        virtualenvs-in-project: true
-        
-    - name: 📚 Load cached dependencies
-      id: cached-poetry-dependencies
-      uses: actions/cache@v3
-      with:
-        path: .venv
-        key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
-        
-    - name: 🔧 Install dependencies
-      if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-      run: poetry install --no-interaction --no-root
-      
-    - name: 🔧 Install project
-      run: poetry install --no-interaction
-      
-    - name: 🎨 Code formatting check (Black)
-      run: poetry run black --check .
-      continue-on-error: true
-      
-    - name: 🔍 Linting (Flake8)
-      run: poetry run flake8 .
-      continue-on-error: true
-      
-    - name: 🧪 Run basic tests
-      run: |
-        echo "✅ Basic validation passed"
-        echo "📦 Project structure validated"
-        echo "🔧 Dependencies installable"
+      - name: 📦 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: 📚 Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: ${{ env.POETRY_VERSION }}
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: 🔍 Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v3
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+
+      - name: 📦 Install dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --no-interaction --no-root
+
+      - name: 📦 Install project
+        run: poetry install --no-interaction
+
+      - name: 🎨 Check code formatting (Black)
+        run: poetry run black --check --diff .
+
+      - name: 📏 Check import sorting (isort)
+        run: poetry run isort --check-only --diff .
+
+      - name: 🔍 Lint code (flake8)
+        run: poetry run flake8 src tests
+
+      - name: 🏷️ Type check (mypy)
+        run: poetry run mypy src
 
   # Security Scanning
-  security-scan:
-    name: 🔒 Security Scan
+  security:
+    name: 🛡️ Security Scan
     runs-on: ubuntu-latest
-    
     steps:
-    - name: 📥 Checkout code
-      uses: actions/checkout@v4
-      
-    - name: 🔍 Run Trivy vulnerability scanner
-      uses: aquasecurity/trivy-action@master
-      with:
-        scan-type: 'fs'
-        scan-ref: '.'
-        format: 'table'
-        exit-code: '0'  # Don't fail on vulnerabilities initially
+      - name: 📦 Checkout code
+        uses: actions/checkout@v4
 
-  # Docker Build
-  docker-build:
-    name: 🐳 Docker Validation
+      - name: 🔐 Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: 📊 Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # Unit Tests
+  test:
+    name: 🧪 Tests
     runs-on: ubuntu-latest
-    needs: [quality-check]
+    strategy:
+      matrix:
+        python-version: ["3.11"]
+    
+    services:
+      postgres:
+        image: ankane/pgvector:latest
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_USER: test_user
+          POSTGRES_DB: test_ardharag
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: 📦 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: 📚 Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: ${{ env.POETRY_VERSION }}
+
+      - name: 📦 Install dependencies
+        run: |
+          poetry install --no-interaction
+          poetry install --no-interaction --no-root
+
+      - name: 🧪 Run tests with coverage
+        env:
+          DATABASE_URL: postgresql://test_user:test_password@localhost/test_ardharag
+          REDIS_URL: redis://localhost:6379
+        run: |
+          poetry run pytest --cov=ardharag --cov-report=xml --cov-report=html
+
+      - name: 📊 Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+
+  # Docker Build Test
+  docker-build:
+    name: 🐳 Docker Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📦 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐳 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🏗️ Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: ardharag:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Integration Tests (when Docker services available)
+  integration-test:
+    name: 🔗 Integration Tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || contains(github.ref, 'staging') || contains(github.ref, 'main')
     
     steps:
-    - name: 📥 Checkout code
-      uses: actions/checkout@v4
-      
-    - name: 🐳 Validate Docker Compose
-      run: |
-        if [ -f "docker/docker-compose.yml" ]; then
-          docker-compose -f docker/docker-compose.yml config
-          echo "✅ Docker Compose configuration valid"
-        else
-          echo "📝 Docker Compose file not found (will be created in Phase 4)"
-        fi
+      - name: 📦 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐳 Start services
+        run: |
+          cd infrastructure/docker
+          docker-compose up -d
+          # Wait for services to be healthy
+          timeout 60s bash -c 'until docker-compose ps | grep healthy; do sleep 2; done'
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: 📚 Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: ${{ env.POETRY_VERSION }}
+
+      - name: 📦 Install dependencies
+        run: poetry install --no-interaction
+
+      - name: 🔗 Run integration tests
+        run: poetry run pytest tests/integration/ -v
+
+      - name: 🛑 Stop services
+        if: always()
+        run: |
+          cd infrastructure/docker
+          docker-compose down -v

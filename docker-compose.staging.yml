@@ -1,0 +1,104 @@
+version: '3.8'
+
+networks:
+  ardharag-staging:
+    driver: bridge
+
+volumes:
+  postgres_data_staging:
+  qdrant_data_staging:
+  redis_data_staging:
+
+services:
+  # ArdhaRAG API (Staging)
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ardharag_api_staging
+    restart: unless-stopped
+    ports:
+      - "8080:8000"  # Different port for staging
+    environment:
+      - ENVIRONMENT=staging
+      - DATABASE_URL=postgresql://ardharag:${POSTGRES_PASSWORD:-staging_pass}@postgres:5432/ardharag_staging
+      - REDIS_URL=redis://redis:6379
+      - QDRANT_URL=http://qdrant:6333
+      - LOG_LEVEL=DEBUG
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ardharag-staging
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.8'
+
+  # Streamlit UI (Staging)
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ardharag_ui_staging
+    restart: unless-stopped
+    ports:
+      - "8581:8501"  # Different port for staging
+    environment:
+      - ENVIRONMENT=staging
+      - ARDHARAG_API_URL=http://api:8000
+    command: ["streamlit", "run", "src/ardharag/ui/main.py", "--server.port=8501", "--server.address=0.0.0.0"]
+    depends_on:
+      - api
+    networks:
+      - ardharag-staging
+
+  # PostgreSQL (Staging)
+  postgres:
+    image: ankane/pgvector:latest
+    container_name: ardharag_postgres_staging
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ardharag_staging
+      POSTGRES_USER: ardharag
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-staging_pass}
+    volumes:
+      - postgres_data_staging:/var/lib/postgresql/data
+      - ./infrastructure/docker/postgres/01-init-age.sql:/docker-entrypoint-initdb.d/01-init-age.sql:ro
+    networks:
+      - ardharag-staging
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ardharag"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Qdrant (Staging)
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: ardharag_qdrant_staging
+    restart: unless-stopped
+    volumes:
+      - qdrant_data_staging:/qdrant/storage
+    networks:
+      - ardharag-staging
+
+  # Redis (Staging)
+  redis:
+    image: redis:7-alpine
+    container_name: ardharag_redis_staging
+    restart: unless-stopped
+    volumes:
+      - redis_data_staging:/data
+    networks:
+      - ardharag-staging
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3

@@ -1,29 +1,58 @@
-name: 🏥 System Health
+name: 💓 Health Check
 
 on:
   schedule:
-    - cron: '0 */6 * * *'  # Every 6 hours
+    - cron: '*/30 * * * *' # Every 30 minutes
   workflow_dispatch:
 
 jobs:
   health-check:
-    name: 🩺 Repository Health Check
+    name: 🏥 System Health
     runs-on: ubuntu-latest
     
     steps:
-    - name: 📥 Checkout code
-      uses: actions/checkout@v4
-      
-    - name: 🔍 Repository structure validation
-      run: |
-        echo "🏗️ Validating repository structure..."
-        ls -la
-        echo "✅ Repository structure healthy"
-        
-    - name: 📊 Project health metrics
-      run: |
-        echo "📈 Collecting health metrics..."
-        echo "🔍 Code quality indicators: Active"
-        echo "🔒 Security monitoring: Active"
-        echo "📊 Performance tracking: Active"
-        echo "✅ All systems operational"
+      - name: 📦 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐳 Health check with Docker
+        run: |
+          cd infrastructure/docker
+          docker-compose up -d
+          
+          # Wait for services
+          sleep 30
+          
+          # Check PostgreSQL
+          if docker exec ardharag_postgres pg_isready -U ardharag; then
+            echo "✅ PostgreSQL healthy"
+          else
+            echo "❌ PostgreSQL unhealthy"
+            exit 1
+          fi
+          
+          # Check Qdrant
+          if curl -f http://localhost:6333; then
+            echo "✅ Qdrant healthy"
+          else
+            echo "❌ Qdrant unhealthy"  
+            exit 1
+          fi
+          
+          # Check Redis
+          if docker exec ardharag_redis redis-cli ping | grep PONG; then
+            echo "✅ Redis healthy"
+          else
+            echo "❌ Redis unhealthy"
+            exit 1
+          fi
+          
+          docker-compose down
+
+      - name: 📊 Report status
+        if: always()
+        run: |
+          if [ $? -eq 0 ]; then
+            echo "🎉 All services healthy"
+          else
+            echo "🚨 Some services unhealthy - check logs"
+          fi

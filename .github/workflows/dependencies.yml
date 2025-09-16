@@ -1,26 +1,61 @@
-name: 🔄 Dependency Management
+name: 🔄 Dependencies Update
 
 on:
   schedule:
-    - cron: '0 6 * * 1'  # Weekly on Monday
+    - cron: '0 2 * * 1' # Every Monday at 2 AM
   workflow_dispatch:
 
 jobs:
-  dependency-check:
-    name: 📦 Dependency Health Check
+  update-dependencies:
+    name: 📦 Update Dependencies
     runs-on: ubuntu-latest
     
     steps:
-    - name: 📥 Checkout code
-      uses: actions/checkout@v4
-        
-    - name: 🐍 Setup Python 3.11
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-        
-    - name: 📦 Validate dependency health
-      run: |
-        echo "🔍 Checking for security vulnerabilities in dependencies"
-        echo "📊 Monitoring dependency freshness"
-        echo "✅ Dependency management active"
+      - name: 📦 Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: 📚 Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: "1.7.1"
+
+      - name: 🔄 Update dependencies
+        run: |
+          poetry update
+          poetry export -f requirements.txt --output requirements.txt --without-hashes
+          poetry export -f requirements.txt --dev --output requirements-dev.txt --without-hashes
+
+      - name: 🧪 Run tests with updated dependencies
+        run: |
+          poetry install --no-interaction
+          poetry run pytest tests/unit/
+
+      - name: 📝 Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: update dependencies"
+          title: "🔄 Automated dependency updates"
+          body: |
+            ## 🔄 Automated Dependency Updates
+            
+            This PR contains automated dependency updates.
+            
+            ### Changes
+            - Updated Poetry dependencies
+            - Regenerated requirements.txt files
+            - All tests passing with updated dependencies
+            
+            ### Review Checklist
+            - [ ] Check for breaking changes in dependency updates
+            - [ ] Verify all tests pass
+            - [ ] Review security updates
+          branch: automated/dependency-updates
+          delete-branch: true

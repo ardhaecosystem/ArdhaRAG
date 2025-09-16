@@ -1,0 +1,110 @@
+name: 🐛 Bug Report
+description: Report a bug or unexpected behavior
+title: "[BUG]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report! 🐛
+        
+        Before submitting, please check if your issue has already been reported.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submission checks
+      options:
+        - label: I searched existing issues and didn't find a duplicate
+          required: true
+        - label: I've read the documentation and troubleshooting guide
+          required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which component is affected?
+      options:
+        - Core RAG Engine
+        - CAPE (Context Optimization)
+        - Knowledge Graphs
+        - Database (PostgreSQL/Qdrant/Redis)
+        - Web Interface
+        - API Endpoints
+        - Docker/Installation
+        - Documentation
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: System environment details
+      placeholder: |
+        - OS: [e.g., Ubuntu 22.04]
+        - Python: [e.g., 3.11.7]
+        - ArdhaRAG Version: [e.g., 0.1.0]
+        - Docker Version: [e.g., 24.0.7]
+        - RAM: [e.g., 8GB]
+        - Browser: [if web interface issue]
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: Clear and concise description of the bug
+      placeholder: What went wrong?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Detailed steps to reproduce the issue
+      placeholder: |
+        1. Start ArdhaRAG with command...
+        2. Upload document...
+        3. Query: "..."
+        4. See error...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What should have happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior  
+      description: What actually happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs
+      description: Paste relevant log output
+      render: shell
+      placeholder: |
+        # Docker logs
+        docker-compose logs
+
+        # Application logs  
+        tail -f data/logs/ardharag.log
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Screenshots, configuration files, or anything else that might help

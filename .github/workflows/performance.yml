@@ -1,26 +1,77 @@
-name: 🏃‍♂️ Performance Testing
+name: ⚡ Performance Benchmarks
 
 on:
   push:
-    branches: [ staging, main ]
-  workflow_dispatch:
+    branches: [main, staging]
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/performance/**'
 
 jobs:
-  performance-test:
-    name: 📊 Performance Benchmarks
+  benchmark:
+    name: 📊 Performance Tests
     runs-on: ubuntu-latest
     
+    services:
+      postgres:
+        image: ankane/pgvector:latest
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_USER: test_user  
+          POSTGRES_DB: test_ardharag
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
     steps:
-    - name: 📥 Checkout code
-      uses: actions/checkout@v4
-      
-    - name: 🐍 Setup Python 3.11
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-        
-    - name: 📊 Basic Performance Validation
-      run: |
-        echo "🚀 Performance testing framework ready"
-        echo "📊 Baseline metrics collection planned"
-        echo "✅ Performance monitoring active"
+      - name: 📦 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: 📚 Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: "1.7.1"
+
+      - name: 📦 Install dependencies
+        run: poetry install --no-interaction
+
+      - name: ⚡ Run performance benchmarks
+        env:
+          DATABASE_URL: postgresql://test_user:test_password@localhost/test_ardharag
+          REDIS_URL: redis://localhost:6379
+        run: |
+          poetry run pytest tests/performance/ --benchmark-only --benchmark-json=benchmark_results.json
+
+      - name: 📊 Upload benchmark results
+        uses: actions/upload-artifact@v3
+        with:
+          name: benchmark-results
+          path: benchmark_results.json
+
+      - name: 📈 Compare benchmarks
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "## Performance Benchmark Results 📊" >> $GITHUB_STEP_SUMMARY
+          echo "Benchmark results will be compared with main branch" >> $GITHUB_STEP_SUMMARY
+          # Future: Add benchmark comparison logic
