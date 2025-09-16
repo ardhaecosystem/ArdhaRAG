@@ -1,0 +1,177 @@
+version: '3.8'
+
+networks:
+  ardharag-prod:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  qdrant_data:
+  redis_data:
+  nginx_certs:
+
+services:
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: ardharag_nginx_prod
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - nginx_certs:/etc/letsencrypt
+    depends_on:
+      - api
+      - ui
+    networks:
+      - ardharag-prod
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.2'
+
+  # ArdhaRAG API
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ardharag_api_prod
+    restart: unless-stopped
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=postgresql://ardharag:${POSTGRES_PASSWORD}@postgres:5432/ardharag
+      - REDIS_URL=redis://redis:6379
+      - QDRANT_URL=http://qdrant:6333
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    networks:
+      - ardharag-prod
+    deploy:
+      resources:
+        limits:
+          memory: 1.5G
+          cpus: '1.0'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Streamlit UI
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - APP_TYPE=ui
+    container_name: ardharag_ui_prod
+    restart: unless-stopped
+    environment:
+      - ENVIRONMENT=production
+      - ARDHARAG_API_URL=http://api:8000
+    command: ["streamlit", "run", "src/ardharag/ui/main.py", "--server.port=8501", "--server.address=0.0.0.0"]
+    depends_on:
+      - api
+    networks:
+      - ardharag-prod
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+
+  # PostgreSQL Database
+  postgres:
+    image: ankane/pgvector:latest
+    container_name: ardharag_postgres_prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ardharag
+      POSTGRES_USER: ardharag
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/docker/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      - ./infrastructure/docker/postgres/01-init-age.sql:/docker-entrypoint-initdb.d/01-init-age.sql:ro
+    command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]
+    networks:
+      - ardharag-prod
+    deploy:
+      resources:
+        limits:
+          memory: 1.5G
+          cpus: '0.8'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ardharag"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Qdrant Vector Database
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: ardharag_qdrant_prod
+    restart: unless-stopped
+    volumes:
+      - qdrant_data:/qdrant/storage
+      - ./infrastructure/docker/qdrant/production.yaml:/qdrant/config/production.yaml:ro
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    networks:
+      - ardharag-prod
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '0.8'
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: ardharag_redis_prod
+    restart: unless-stopped
+    command: redis-server /etc/redis/redis.conf
+    volumes:
+      - redis_data:/data
+      - ./infrastructure/docker/redis/redis.conf:/etc/redis/redis.conf:ro
+    networks:
+      - ardharag-prod
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.3'
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Monitoring (Optional for production)
+  watchtower:
+    image: containrrr/watchtower
+    container_name: ardharag_watchtower_prod
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --interval 3600 --cleanup
+    networks:
+      - ardharag-prod
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: '0.1'

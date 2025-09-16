@@ -1,0 +1,57 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+build
+*.egg-info
+.venv
+venv
+
+# Testing
+.pytest_cache
+.coverage
+htmlcov
+.tox
+
+# IDE
+.vscode
+.idea
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation
+docs/_build
+
+# Node modules
+node_modules
+
+# Data directories
+data/documents/*
+data/models/*
+data/cache/*
+data/logs/*
+data/backups/*
+
+# Keep gitkeep files
+!**/.gitkeep
+
+# Development files
+docker-compose.dev.yml
+docker-compose.test.yml
+tests_backup/
+*_backup.py
+migration_*.md
+rollback_*.sh
+validate_*.sh
+
+# CI/CD
+.github

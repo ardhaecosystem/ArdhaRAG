@@ -1,43 +1,78 @@
-name: 🎉 Release Management
+name: 🚀 Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: true
+        type: string
+
+env:
+  PYTHON_VERSION: "3.11"
+  POETRY_VERSION: "1.7.1"
 
 jobs:
-  create-release:
-    name: 🎁 Create Release
+  release:
+    name: 🏷️ Create Release
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
     
     steps:
-    - name: 📥 Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        
-    - name: 🎉 Create GitHub Release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ github.ref }}
-        release_name: ArdhaRAG ${{ github.ref }}
-        body: |
-          ## 🚀 ArdhaRAG Release ${{ github.ref }}
-          
-          World's First Predictive RAG System
-          
-          ### 📦 Installation
-          
-          ```bash
-          curl -sSL https://raw.githubusercontent.com/ardhaecosystem/ardharag/${{ github.ref }}/scripts/install.sh | bash
-          ```
-          
-          ### 🔮 Revolutionary Features
-          - Context-Aware Prompt Engineering (40-60% token reduction)
-          - Hallucination prevention and verification
-          - Predictive intelligence capabilities
-          - Resource-efficient deployment (8GB RAM)
-        draft: false
-        prerelease: ${{ contains(github.ref, '-') }}
+      - name: 📦 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: 📚 Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: ${{ env.POETRY_VERSION }}
+
+      - name: 📦 Install dependencies
+        run: poetry install --no-interaction
+
+      - name: 🧪 Run tests
+        run: poetry run pytest
+
+      - name: 🏗️ Build package
+        run: poetry build
+
+      - name: 📋 Generate changelog
+        id: changelog
+        run: |
+          # Simple changelog generation - can be enhanced later
+          echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
+          echo "## What's Changed" >> $GITHUB_OUTPUT
+          git log --oneline --pretty=format:"- %s" $(git describe --tags --abbrev=0)..HEAD >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT  
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: 🏷️ Create Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.event.inputs.version || 'auto' }}
+          release_name: Release ${{ github.event.inputs.version || 'auto' }}
+          body: ${{ steps.changelog.outputs.CHANGELOG }}
+          draft: false
+          prerelease: false
+
+      - name: 📦 Upload Release Assets
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./dist/
+          asset_name: ardharag-dist
+          asset_content_type: application/zip
