@@ -1,23 +1,110 @@
-[tool.poetry]
-name = "ardharag"
-version = "0.1.0"
-description = "Revolutionary Context-Aware RAG with Predictive Intelligence"
-authors = ["Ardha Ecosystem <ardhaecosystem@gmail.com>"]
-license = "MIT"
-readme = "README.md"
-packages = [{include = "ardharag"}]
-
-[tool.poetry.dependencies]
-python = "^3.11"
-fastapi = "^0.104.0"
-uvicorn = "^0.24.0"
-streamlit = "^1.28.0"
-
-[tool.poetry.group.dev.dependencies]
-pytest = "^7.4.0"
-black = "^23.9.0"
-flake8 = "^6.1.0"
-
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "ardharag"
+version = "0.1.0"
+description = "World's First Predictive RAG System - Context-Aware RAG with Hallucination Prevention"
+authors = ["Ardha Ecosystem <ardhaecosystem@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/ardhaecosystem/ArdhaRAG"
+repository = "https://github.com/ardhaecosystem/ArdhaRAG"
+documentation = "https://github.com/ardhaecosystem/ArdhaRAG/docs"
+keywords = ["rag", "llm", "ai", "predictive", "context-aware", "hallucination-prevention"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+# Modern src layout
+packages = [{include = "ardharag", from = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+# Core dependencies
+fastapi = "^0.104.1"
+uvicorn = {extras = ["standard"], version = "^0.24.0"}
+pydantic = "^2.5.0"
+pydantic-settings = "^2.1.0"
+
+# Database dependencies  
+psycopg2-binary = "^2.9.9"
+redis = "^5.0.1"
+qdrant-client = "^1.7.0"
+
+# LLM integrations
+openai = "^1.6.1"
+anthropic = "^0.8.1"
+tiktoken = "^0.5.2"
+
+# Document processing
+unstructured = "^0.11.6"
+pypdf = "^3.17.1"
+python-docx = "^1.1.0"
+python-multipart = "^0.0.6"
+
+# ML/AI dependencies
+sentence-transformers = "^2.2.2"
+numpy = "^1.24.3"
+scikit-learn = "^1.3.0"
+
+# Web UI
+streamlit = "^1.29.0"
+plotly = "^5.17.0"
+
+# Utilities
+python-dotenv = "^1.0.0"
+loguru = "^0.7.2"
+httpx = "^0.25.2"
+aiofiles = "^23.2.1"
+
+[tool.poetry.group.dev.dependencies]
+# Testing
+pytest = "^7.4.3"
+pytest-asyncio = "^0.21.1"
+pytest-cov = "^4.1.0"
+httpx = "^0.25.2"
+
+# Code quality
+black = "^23.11.0"
+isort = "^5.12.0"
+flake8 = "^6.1.0"
+mypy = "^1.7.1"
+pre-commit = "^3.6.0"
+
+# Documentation
+mkdocs = "^1.5.3"
+mkdocs-material = "^9.4.14"
+
+[tool.poetry.scripts]
+ardharag = "ardharag.api.main:app"
+
+# Tool configurations
+[tool.black]
+line-length = 100
+target-version = ['py311']
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+line_length = 100
+src_paths = ["src", "tests"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --cov=ardharag --cov-report=html --cov-report=term-missing"
+
